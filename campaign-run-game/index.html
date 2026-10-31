@@ -600,24 +600,28 @@ const Share = {
     const states = d.won.length ? `\u2705 ${d.won.length} state${d.won.length > 1 ? "s" : ""} secured: ${d.won.map(s => s.id).join(", ")}` : "\u{1F6A9} No states secured yet \u2014 the race is on!";
     return `CAMPAIGN RUN\n${head}\n${states}\n\u{1F4CA} Popularity: ${d.pop}%\nThink you can beat my run?${this.url() ? "\n" + this.url() : ""}`;
   },
-  card(d) {
+  card(d) { // square results card: game name + the US map with secured states in the party color
     const W = 900, cv = document.createElement("canvas"); cv.width = cv.height = W; const c = cv.getContext("2d"), col = d.p.color;
+    const SMALL = ["VT", "NH", "MA", "RI", "CT", "NJ", "DE", "MD"], won = id => d.sv.won.includes(id);
     const t = (txt, x, y, size, color, align) => { c.fillStyle = color; c.font = "bold " + size + "px sans-serif"; c.textAlign = align || "center"; c.fillText(txt, x, y); };
     c.fillStyle = "#18181a"; c.fillRect(0, 0, W, W);
     const g = c.createRadialGradient(0, W, 0, 0, W, 760); g.addColorStop(0, col + "99"); g.addColorStop(1, col + "00"); c.fillStyle = g; c.fillRect(0, 0, W, W);
     const im = document.getElementById("logo");
-    if (im && im.naturalWidth) { const w = 440, h = im.naturalHeight * w / im.naturalWidth; c.drawImage(im, (W - w) / 2, 28, w, h); }
-    t(d.win ? "PRESIDENTIAL VICTORY!" : d.won.length ? "ON THE CAMPAIGN TRAIL" : "THE RACE IS ON", W / 2, 372, 38, d.win ? "#ffd54a" : "#fff");
-    t(d.p.name.toUpperCase(), W / 2, 420, 32, shade(col, 0.45));
-    t("ELECTORAL VOTES", W / 2, 462, 22, "#9aa0b4");
-    t(d.sv.votes + " / " + CONFIG.WIN_VOTES, W / 2, 565, 112, "#fff");
-    rrect(c, 90, 585, 720, 22, 11, "rgba(255,255,255,.18)"); if (d.sv.votes > 0) rrect(c, 90, 585, Math.max(22, 720 * Math.min(1, d.sv.votes / CONFIG.WIN_VOTES)), 22, 11, col);
-    t("POPULARITY", 90, 648, 22, "#9aa0b4", "left"); t(d.pop + "%", 810, 648, 22, "#fff", "right");
-    rrect(c, 90, 658, 720, 16, 8, "rgba(255,255,255,.18)"); if (d.pop > 0) rrect(c, 90, 658, Math.max(16, 7.2 * d.pop), 16, 8, d.pop > 60 ? "#2ecc71" : d.pop > 30 ? "#f1c40f" : "#e74c3c");
-    if (!d.won.length) t("No states secured yet \u2014 the race is on!", W / 2, 760, 28, "#cfd3e3");
-    d.won.slice(0, 24).forEach((s, i) => { const x = 60 + (i % 8) * 98, y = 705 + Math.floor(i / 8) * 46; rrect(c, x, y, 90, 38, 9, col); t(s.id + " " + s.ev, x + 45, y + 26, 20, "#fff"); });
-    if (d.won.length > 24) t("+" + (d.won.length - 24) + " more states", 60, 862, 20, "#cfd3e3", "left");
-    t("Play CAMPAIGN RUN \u2014 can you beat my run?", W / 2, 890, 20, "#9aa0b4");
+    if (im && im.naturalWidth) { const w = 330, h = im.naturalHeight * w / im.naturalWidth; c.drawImage(im, (W - w) / 2, 20, w, h); }
+    t(d.win ? "PRESIDENTIAL VICTORY!" : d.won.length ? "ON THE CAMPAIGN TRAIL" : "THE RACE IS ON", W / 2, 282, 34, d.win ? "#ffd54a" : "#fff");
+    t(d.sv.votes + " / " + CONFIG.WIN_VOTES + " ELECTORAL VOTES", W / 2, 328, 32, "#fff");
+    t(`${d.p.name} \u00B7 ${d.won.length}/${CONFIG.STATES.length} states \u00B7 ${d.pop}% popularity`, W / 2, 362, 22, shade(col, 0.45));
+    if (!Geo.shapes) Geo.build();
+    const k = 1.2; c.save(); c.translate((W - 640 * k) / 2, 378); c.scale(k, k); c.lineJoin = "round";
+    for (const s of CONFIG.STATES) {
+      const gs = Geo.shapes[s.id], path = new Path2D(gs.d);
+      c.fillStyle = won(s.id) ? col : "#34374a"; c.fill(path); c.strokeStyle = "#18181a"; c.lineWidth = 1.3; c.stroke(path);
+      if (!SMALL.includes(s.id)) { c.fillStyle = won(s.id) ? "#fff" : "rgba(255,255,255,.35)"; c.font = "bold 10px sans-serif"; c.textAlign = "center"; c.fillText(s.id, gs.cx, gs.cy + 3); }
+    }
+    SMALL.forEach((id, i) => { const y = 90 + i * 31; rrect(c, 566, y, 66, 27, 6, won(id) ? col : "#34374a");
+      c.fillStyle = won(id) ? "#fff" : "rgba(255,255,255,.4)"; c.font = "bold 12px sans-serif"; c.textAlign = "center"; c.fillText(id + " " + STATE_BY_ID[id].ev, 599, y + 18); });
+    c.restore();
+    t("Play CAMPAIGN RUN \u2014 can you beat my run?", W / 2, 892, 18, "#9aa0b4");
     return cv;
   },
   async share() {
