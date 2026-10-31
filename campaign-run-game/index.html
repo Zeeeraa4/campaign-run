@@ -45,6 +45,10 @@ h1{margin:0;font-size:clamp(22px,5vw,34px)}
 .pbar i{display:block;height:100%;border-radius:5px;transition:width .4s}
 .big{font-size:clamp(34px,10vw,68px);font-weight:900;color:#2ecc71;text-transform:uppercase;letter-spacing:.04em;animation:logoIn .6s cubic-bezier(.2,1.3,.4,1) both}
 #failSub{max-width:420px;opacity:.9}
+.acts{display:flex;flex-direction:column;gap:6px}
+.acts .btn{padding:8px 14px;min-height:40px;font-size:14px}
+#shareImg{max-width:min(80vw,340px);max-height:40vh;border-radius:14px;object-fit:contain}
+#shareText{width:min(90vw,420px);height:96px;border-radius:10px;border:0;padding:10px;font:inherit;font-size:13px;resize:none;user-select:text;-webkit-user-select:text}
 </style></head><body>
 
 <!-- SCREEN 1 -->
@@ -62,7 +66,7 @@ h1{margin:0;font-size:clamp(22px,5vw,34px)}
 <section id="s2" class="screen" style="justify-content:flex-start">
   <div id="bar">
     <div><div id="ev">Electoral Votes: 0 / 270</div><div class="pm">POPULARITY <div class="pbar"><i id="pfill"></i></div> <b id="ptxt"></b></div></div>
-    <button class="btn" id="reset" style="background:var(--red);color:#fff">Reset Campaign</button>
+    <div class="acts"><button class="btn" id="share" style="background:var(--blue);color:#fff">Share Results</button><button class="btn" id="reset" style="background:var(--red);color:#fff">Reset Campaign</button></div>
   </div>
   <div style="font-size:13px;opacity:.8">Tap a state to campaign. You must collect as many votes as the state has electoral votes. Warmer orange = tougher run (more electoral votes). Small states are boxed on the right.</div>
   <div id="mapWrap"><svg id="map" viewBox="0 0 640 420" aria-label="US campaign map"></svg></div>
@@ -79,8 +83,18 @@ h1{margin:0;font-size:clamp(22px,5vw,34px)}
 <section id="win" class="screen">
   <h1>Presidential Victory!<br>Welcome to the White House</h1>
   <div style="font-size:64px">🏛️</div>
+  <button class="btn" id="shareWin">Share My Victory</button>
   <button class="btn" id="newCampaign">Start a New Campaign</button>
 </section>
+
+<div id="shareModal" class="ov" style="z-index:30;overflow:auto;background:rgba(10,14,26,.95)">
+  <h2 style="margin:0">Share Your Results</h2>
+  <img id="shareImg" alt="Your election results card">
+  <textarea id="shareText" readonly></textarea>
+  <div id="shareMsg" style="min-height:1.2em;font-size:14px"></div>
+  <div style="display:flex;gap:10px"><button class="btn" id="shareCopy" style="background:var(--blue);color:#fff">Copy Text</button><button class="btn" id="shareClose" style="background:#555;color:#fff">Close</button></div>
+  <div style="font-size:12px;opacity:.75;max-width:340px">Tip: press and hold the image to save it, then post it with your text.</div>
+</div>
 
 <script>
 "use strict";
@@ -571,6 +585,66 @@ const UI = {
 };
 
 /* =========================================================
+   SHARE — builds a text + image card from the live campaign and shares it
+   (native share sheet when available, otherwise a copy/save dialog)
+   ========================================================= */
+const Share = {
+  data() {
+    const sv = App.save, p = CONFIG.PARTIES[sv.party];
+    return { sv, p, won: CONFIG.STATES.filter(s => sv.won.includes(s.id)).sort((a, b) => b.ev - a.ev), win: sv.votes >= CONFIG.WIN_VOTES, pop: Math.round(sv.popularity) };
+  },
+  url() { return /^https?:/.test(location.href) ? location.href : ""; },
+  text(d) {
+    const head = d.win ? `\u{1F3DB}\uFE0F PRESIDENTIAL VICTORY! I won the White House as ${d.p.name} with ${d.sv.votes} electoral votes!`
+      : `\u{1F5F3}\uFE0F I\u2019m running as ${d.p.name} and I\u2019m at ${d.sv.votes}/${CONFIG.WIN_VOTES} electoral votes.`;
+    const states = d.won.length ? `\u2705 ${d.won.length} state${d.won.length > 1 ? "s" : ""} secured: ${d.won.map(s => s.id).join(", ")}` : "\u{1F6A9} No states secured yet \u2014 the race is on!";
+    return `CAMPAIGN RUN\n${head}\n${states}\n\u{1F4CA} Popularity: ${d.pop}%\nThink you can beat my run?${this.url() ? "\n" + this.url() : ""}`;
+  },
+  card(d) {
+    const W = 900, cv = document.createElement("canvas"); cv.width = cv.height = W; const c = cv.getContext("2d"), col = d.p.color;
+    const t = (txt, x, y, size, color, align) => { c.fillStyle = color; c.font = "bold " + size + "px sans-serif"; c.textAlign = align || "center"; c.fillText(txt, x, y); };
+    c.fillStyle = "#18181a"; c.fillRect(0, 0, W, W);
+    const g = c.createRadialGradient(0, W, 0, 0, W, 760); g.addColorStop(0, col + "99"); g.addColorStop(1, col + "00"); c.fillStyle = g; c.fillRect(0, 0, W, W);
+    const im = document.getElementById("logo");
+    if (im && im.naturalWidth) { const w = 440, h = im.naturalHeight * w / im.naturalWidth; c.drawImage(im, (W - w) / 2, 28, w, h); }
+    t(d.win ? "PRESIDENTIAL VICTORY!" : d.won.length ? "ON THE CAMPAIGN TRAIL" : "THE RACE IS ON", W / 2, 372, 38, d.win ? "#ffd54a" : "#fff");
+    t(d.p.name.toUpperCase(), W / 2, 420, 32, shade(col, 0.45));
+    t("ELECTORAL VOTES", W / 2, 462, 22, "#9aa0b4");
+    t(d.sv.votes + " / " + CONFIG.WIN_VOTES, W / 2, 565, 112, "#fff");
+    rrect(c, 90, 585, 720, 22, 11, "rgba(255,255,255,.18)"); if (d.sv.votes > 0) rrect(c, 90, 585, Math.max(22, 720 * Math.min(1, d.sv.votes / CONFIG.WIN_VOTES)), 22, 11, col);
+    t("POPULARITY", 90, 648, 22, "#9aa0b4", "left"); t(d.pop + "%", 810, 648, 22, "#fff", "right");
+    rrect(c, 90, 658, 720, 16, 8, "rgba(255,255,255,.18)"); if (d.pop > 0) rrect(c, 90, 658, Math.max(16, 7.2 * d.pop), 16, 8, d.pop > 60 ? "#2ecc71" : d.pop > 30 ? "#f1c40f" : "#e74c3c");
+    if (!d.won.length) t("No states secured yet \u2014 the race is on!", W / 2, 760, 28, "#cfd3e3");
+    d.won.slice(0, 24).forEach((s, i) => { const x = 60 + (i % 8) * 98, y = 705 + Math.floor(i / 8) * 46; rrect(c, x, y, 90, 38, 9, col); t(s.id + " " + s.ev, x + 45, y + 26, 20, "#fff"); });
+    if (d.won.length > 24) t("+" + (d.won.length - 24) + " more states", 60, 862, 20, "#cfd3e3", "left");
+    t("Play CAMPAIGN RUN \u2014 can you beat my run?", W / 2, 890, 20, "#9aa0b4");
+    return cv;
+  },
+  async share() {
+    const d = this.data(), text = this.text(d), cv = this.card(d);
+    let file = null; try { const blob = await new Promise(r => cv.toBlob(r, "image/png")); if (blob) file = new File([blob], "campaign-run-results.png", { type: "image/png" }); } catch (e) {}
+    try {
+      if (navigator.share) {
+        const data = { title: "Campaign Run", text }; if (this.url()) data.url = this.url();
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+        await navigator.share(data); return;
+      }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    this.modal(text, cv);
+  },
+  modal(text, cv) {
+    UI.$("shareImg").src = cv.toDataURL("image/png"); UI.$("shareText").value = text; UI.$("shareMsg").textContent = "";
+    UI.$("shareModal").classList.add("on");
+  },
+  copy() {
+    const ta = UI.$("shareText"), msg = m => UI.$("shareMsg").textContent = m;
+    const old = () => { ta.focus(); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) {} msg(ok ? "Copied!" : "Text selected \u2014 press and hold to copy."); };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(ta.value).then(() => msg("Copied!"), old); return; } } catch (e) {}
+    old();
+  }
+};
+
+/* =========================================================
    6. APP — flow controller
    ========================================================= */
 const App = {
@@ -582,6 +656,8 @@ const App = {
     UI.$("pickBlue").onclick = () => this.choose("blue");
     UI.$("pickRed").onclick = () => this.choose("red");
     UI.$("reset").onclick = () => this.reset();
+    UI.$("share").onclick = () => Share.share(); UI.$("shareWin").onclick = () => Share.share();
+    UI.$("shareCopy").onclick = () => Share.copy(); UI.$("shareClose").onclick = () => UI.$("shareModal").classList.remove("on");
     UI.$("newCampaign").onclick = () => this.reset();
     UI.$("retry").onclick = () => this.run(this.current);
     UI.$("quit").onclick = () => this.toMap();
