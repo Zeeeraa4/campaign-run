@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Run - Play Free Online</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+        /* Plays your Claude game completely fullscreen without changing its code */
+        #game-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- AUTOMATIC GAME INJECTOR -->
+    <iframe id="game-frame" src="campaign-run-game/index.html"></iframe>
+
+    <script>
+        // Automatically forces keyboard focus onto your endless runner game canvas on launch
+        window.addEventListener('load', function() {
+            document.getElementById('game-frame').contentWindow.focus();
+        });
+    </script>
+</body>
+</html>
